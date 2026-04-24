@@ -2,6 +2,7 @@
 #define PROTOCOL_H
 
 #include <stdint.h>
+#include <pthread.h>
 
 // Server constants
 #define MAX_CLIENTS 30
@@ -93,14 +94,14 @@ typedef struct
     char data[MAX_PACKET_SIZE];
 }response_packet;
 
-typedef struct 
+typedef struct room room; // forward declaration for client struct
 {
     int fd;
     int user_id;
     char username[MAX_USERNAME_LEN];
     int role;
     struct room *current_room;
-    int is_mute
+    int is_mute;
     int is_active;
 }client;
 
@@ -116,4 +117,34 @@ typedef struct room
     struct room *prev; 
     struct room *next; // for linked list (dynamic deletion or addition)
 }room;
+
+ 
+
+typedef struct
+{
+    int seq_num;
+    int timestamp;
+    int payload_size;
+    int payload[AUDIO_PAYLOAD_SIZE];
+    int valid; // flag to indicate if the packet is valid (for jitter buffer)
+}jitter_entry;
+
+typedef struct
+{
+    jitter_entry buffer[JITTER_BUFFER_SIZE];
+    int head;
+    int tail;
+    int count;
+    int next_expected_seq;
+}jitter_buffer;
+
+typedef struct
+{
+    audio_packet packets[RING_BUFFER_CAPACITY];
+    int head;
+    int tail;
+    int count;
+}ring_buffer;
+
+#endif
 
