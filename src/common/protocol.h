@@ -2,6 +2,10 @@
 #define PROTOCOL_H
 
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 #include <pthread.h>
 
 // Server constants
@@ -45,16 +49,30 @@
 #define STATUS_ERR_INTERNAL 500
 
 
+
+/* in this all struct 
+    i have somewhere used int32 or int16 or int8 
+    because lets say we have 2 computer, in one int is 4 and another is 2 bytes
+    this creates mismatch in data 
+    so whatever data needs to be sent over network or stored in the disk
+    ,we have to be specific and used fixed size for int
+
+    in some place where i use int they are all stored in the memory itself
+    so it doesnt matter what type of int we use
+
+*/
+
+
 // Structs
 
-typdef struct 
+typedef struct 
 {
     int32_t user_id;
     char username[MAX_USERNAME_LEN];
     char role[MAX_ROLE_LEN];
     char password_hash[65];
     int32_t is_active;
-} user_record;
+} user_record; // saved to disk
 
 typedef struct 
 {
@@ -63,38 +81,41 @@ typedef struct
     char password[MAX_PASSWORD_LEN];
     int32_t is_active;
     int32_t user_count;
-} room_record;
+} room_record; // saved to disk
 
-
-typdef struct
-{
-    int room_id;
-    int seq_num;
-    int timestamp;
-    int payload_size;
-    int payload[AUDIO_PAYLOAD_SIZE];
-}audio_packet;
 
 typedef struct
 {
-    int opcode;
+    uint32_t room_id;
+    uint32_t seq_num;
+    uint32_t timestamp;
+    uint16_t payload_size;
+    uint8_t payload[AUDIO_PAYLOAD_SIZE];
+}audio_packet; //sent over network
+
+typedef struct
+{
+    uint32_t opcode;
     char username[MAX_USERNAME_LEN];
     char password[MAX_PASSWORD_LEN];
     char room_name[MAX_ROOM_NAME_LEN];
     char room_password[MAX_PASSWORD_LEN];
     char target_username[MAX_USERNAME_LEN];
     char data[MAX_PACKET_SIZE];
-}command_packet;
+}command_packet; // sent over network
 
 typedef struct
 {
-    int opcode;
-    int status;
+    uint32_t opcode;
+    uint32_t status;
     char message[256];
     char data[MAX_PACKET_SIZE];
-}response_packet;
+}response_packet; // sent over network
 
-typedef struct room room; // forward declaration for client struct
+typedef struct room room;
+ // forward declaration for client struct
+
+typedef struct
 {
     int fd;
     int user_id;
@@ -103,9 +124,9 @@ typedef struct room room; // forward declaration for client struct
     struct room *current_room;
     int is_mute;
     int is_active;
-}client;
+} client; // stays in memory
 
-typedef struct room
+typedef struct
 {
     int room_id;
     char room_name[MAX_ROOM_NAME_LEN];
@@ -116,18 +137,18 @@ typedef struct room
     pthread_mutex_t lock;
     struct room *prev; 
     struct room *next; // for linked list (dynamic deletion or addition)
-}room;
+}room; // stays in memory
 
  
 
 typedef struct
 {
-    int seq_num;
-    int timestamp;
-    int payload_size;
-    int payload[AUDIO_PAYLOAD_SIZE];
+    uint32_t seq_num;
+    uint32_t timestamp;
+    uint16_t payload_size;
+    uint8_t payload[AUDIO_PAYLOAD_SIZE];
     int valid; // flag to indicate if the packet is valid (for jitter buffer)
-}jitter_entry;
+}jitter_entry; // sent over network ,the int valid is in memory
 
 typedef struct
 {
@@ -135,16 +156,16 @@ typedef struct
     int head;
     int tail;
     int count;
-    int next_expected_seq;
-}jitter_buffer;
+    uint32_t next_expected_seq;
+}jitter_buffer; // stays in memory
 
 typedef struct
 {
     audio_packet packets[RING_BUFFER_CAPACITY];
-    int head;
-    int tail;
-    int count;
-}ring_buffer;
+    uint32_t head;
+    uint32_t tail;
+    uint32_t count;
+}ring_buffer; // shared data
 
 #endif
 
