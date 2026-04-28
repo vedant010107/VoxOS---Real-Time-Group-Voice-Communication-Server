@@ -7,6 +7,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <fcntl.h>
+
 
 // Server constants
 #define MAX_CLIENTS 30
