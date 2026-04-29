@@ -128,7 +128,7 @@ typedef struct
     int is_active;
 } client; // stays in memory
 
-typedef struct
+typedef struct room
 {
     int room_id;
     char room_name[MAX_ROOM_NAME_LEN];
