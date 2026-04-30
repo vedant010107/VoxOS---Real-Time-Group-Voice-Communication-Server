@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 199309L
 #include "protocol.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,7 +6,7 @@
 #include <time.h>
 #include <stdarg.h>
 #include <pthread.h>
-#include <linux/time.h>
+
 
 
 long long get_time_ms()

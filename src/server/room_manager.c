@@ -194,12 +194,12 @@ int room_leave(client *c)
     room *r=c->current_room;
     pthread_mutex_lock(&r->lock);
 
-    int found=0;
+    // int found=0;
     for(int i=0;i<r->participant_count;i++)
     {
         if(r->participants[i]==c)
         {
-            found=1;
+            // found=1;
             for(int j=i;j<r->participant_count-1;j++)
 
             {
@@ -300,12 +300,12 @@ void remove_client_from_room(room *r,client *c)
     }
     pthread_mutex_lock(&r->lock);
 
-    int found=0;
+    // int found=0;
     for(int i=0;i<r->participant_count;i++)
     {
         if(r->participants[i]==c)
         {
-            found=1;
+            // found=1;
             for(int j=i;j<r->participant_count-1;j++)
             {
                 r->participants[j]=r->participants[j+1];

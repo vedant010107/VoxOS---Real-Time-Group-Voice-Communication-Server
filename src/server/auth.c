@@ -67,7 +67,7 @@ int auth_authenticate(const char *username,const char *password ,int *role_out)
     }
     else
     {
-        *role_out=ROLE_USER; // default to guest if role is unrecognized
+        *role_out=ROLE_USER; // default to user if role is unrecognized
     }
 
     return 1;
@@ -84,6 +84,8 @@ int auth_check_permission(int role,int command)
     case CMD_LIST:
     case CMD_STATUS:
         return 1; // all roles can do these
+    case CMD_PROMOTE:
+        return role==ROLE_ADMIN; // only admin can promote
     case CMD_CREATE:
     case CMD_KICK:
     case CMD_MUTE:
@@ -125,5 +127,35 @@ int auth_add_user(const char *username,const char *password,const char *role)
     write(users_fd,&new_user,sizeof(new_user));
 
     log_message("INFO","New user added: %s with role %s",username,role);
+    return 1;
+}
+
+int auth_promote_user(const char *username, const char *new_role)
+{
+    user_record rec;
+    int found=0;
+    off_t offset = 0;
+    
+    lseek(users_fd,0,SEEK_SET);
+
+    while(read(users_fd,&rec,sizeof(rec))==sizeof(rec))
+    {
+        if(rec.is_active && strcmp(rec.username,username)==0)
+        {
+            found=1;
+            break;
+        }
+        offset += sizeof(rec);
+    }
+
+    if (!found) return 0;
+
+    strncpy(rec.role, new_role, MAX_ROLE_LEN - 1);
+    rec.role[MAX_ROLE_LEN - 1] = '\0';
+    
+    lseek(users_fd, offset, SEEK_SET);
+    write(users_fd, &rec, sizeof(rec));
+
+    log_message("INFO", "User %s promoted to %s", username, new_role);
     return 1;
 }

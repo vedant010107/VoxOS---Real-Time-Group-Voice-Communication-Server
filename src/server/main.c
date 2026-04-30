@@ -14,7 +14,7 @@ room *room_head=NULL;
 int room_count=0;
 pthread_mutex_t rooms_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-ring_buffer *shm_ring=NULL;
+// ring_buffer *shm_ring=NULL;
 jitter_buffer jitter_buffers[MAX_CLIENTS];
 pthread_mutex_t jitter_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -36,7 +36,7 @@ void handle_signal(int sig)
     }
 }
 
-int main(int argc,char * argv)
+int main(int argc,char * argv[])
 {   
     if(argc>1)
     {

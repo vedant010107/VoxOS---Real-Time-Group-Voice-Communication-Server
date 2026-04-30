@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <fcntl.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 
 // Server constants
@@ -18,7 +20,7 @@
 #define MAX_ROLE_LEN  16
 #define MAX_ROOM_NAME_LEN 32
 #define MAX_PACKET_SIZE  4096
-#define AUDIO_PAYLOAD_SIZE  512
+#define AUDIO_PAYLOAD_SIZE  2048
 #define JITTER_BUFFER_SIZE 20
 #define MAX_SPEAKERS_PER_ROOM 5
 #define RING_BUFFER_CAPACITY  64
@@ -40,6 +42,7 @@
 #define CMD_KICK 7
 #define CMD_MUTE 8
 #define CMD_STATUS 9
+#define CMD_PROMOTE 10
 
 // Status codes
 #define STATUS_OK 200
@@ -89,6 +92,7 @@ typedef struct
 typedef struct
 {
     uint32_t room_id;
+    uint32_t sender_id; 
     uint32_t seq_num;
     uint32_t timestamp;
     uint16_t payload_size;
@@ -120,12 +124,16 @@ typedef struct room room;
 typedef struct
 {
     int fd;
+    int slot;
     int user_id;
     char username[MAX_USERNAME_LEN];
     int role;
     struct room *current_room;
     int is_mute;
     int is_active;
+    int ref_count;
+    struct sockaddr_in udp_addr;
+    socklen_t udp_addr_len;
 } client; // stays in memory
 
 typedef struct room
@@ -158,6 +166,7 @@ typedef struct
     int head;
     int tail;
     int count;
+    int buffering;
     uint32_t next_expected_seq;
 }jitter_buffer; // stays in memory
 

@@ -1,0 +1,70 @@
+[30-04-2026 21:28:48] [INFO] Starting VoxOS Server on port 8080
+[30-04-2026 21:28:48] [INFO] Rooms data file created successfully
+[30-04-2026 21:28:48] [INFO] WAL data file created successfully
+[30-04-2026 21:28:48] [INFO] File-based database ready
+[30-04-2026 21:28:48] [INFO] Users data file not found, creating new one.
+[30-04-2026 21:28:48] [INFO] Default admin user created with username 'admin' and password 'admin123'
+[30-04-2026 21:28:48] [INFO] Authentication system initialized successfully
+[30-04-2026 21:28:48] [INFO] Room manager initialized
+[30-04-2026 21:28:48] [INFO] TCP Server listening on port 8080
+[30-04-2026 21:28:48] [INFO] UDP Server listening on port 8080
+[30-04-2026 21:28:48] [INFO] epoll initialization complete.Server is ready .
+[30-04-2026 21:28:48] [INFO] Client handler initialized with 4 worker threads
+[30-04-2026 21:28:48] [INFO] Emergency FIFO ready: /temp/voxos_emergency
+[30-04-2026 21:28:48] [INFO] IPC manager initialized successfully(ring + semaphores)
+[30-04-2026 21:28:48] [INFO] Audio mixer ready (real-time thread, 5 speakers/room)
+[30-04-2026 21:28:48] [INFO] Console display started
+[30-04-2026 21:28:48] [INFO] Server initialization complete. Waiting for clients...
+[30-04-2026 21:28:48] [INFO] Entering main network event loop
+[30-04-2026 21:28:48] [WARN] Could not set SCHED_FIFO: Operation not permitted (run as root for best results)
+===== VOXOS SERVER STATUS =====
+Uptime: 18933417 ms | Port: 8080 | Clients: 0/30
+----------------------------------
+Rooms (0 active):
+  (no active rooms)
+----------------------------------
+Connected clients:
+----------------------------------
+Database: open | WAL: open | users: open
+Emergency FIFO: /tmp/voxos_emergency
+Press Ctrl+C to stop the server
+[30-04-2026 21:28:48] [INFO] New client connected from 127.0.0.1. Assigned slot 0, fd 25
+[30-04-2026 21:28:48] [INFO] Client fd 25 logged in as admin with role 1
+[30-04-2026 21:28:48] [INFO] Room created: myroom (ID: 0) by user admin
+[30-04-2026 21:28:48] [INFO] Client admin joined room myroom (ID: 0)
+===== VOXOS SERVER STATUS =====
+Uptime: 18934418 ms | Port: 8080 | Clients: 1/30
+----------------------------------
+Rooms (1 active):
+  [0] myroom - 1 users, 1 speakers (locked)
+----------------------------------
+Connected clients:
+  [0] admin (role:1) room:myroom
+----------------------------------
+Database: open | WAL: open | users: open
+Emergency FIFO: /tmp/voxos_emergency
+Press Ctrl+C to stop the server
+===== VOXOS SERVER STATUS =====
+Uptime: 18935420 ms | Port: 8080 | Clients: 1/30
+----------------------------------
+Rooms (1 active):
+  [0] myroom - 1 users, 1 speakers (locked)
+----------------------------------
+Connected clients:
+  [0] admin (role:1) room:myroom
+----------------------------------
+Database: open | WAL: open | users: open
+Emergency FIFO: /tmp/voxos_emergency
+Press Ctrl+C to stop the server
+===== VOXOS SERVER STATUS =====
+Uptime: 18936421 ms | Port: 8080 | Clients: 1/30
+----------------------------------
+Rooms (1 active):
+  [0] myroom - 1 users, 1 speakers (locked)
+----------------------------------
+Connected clients:
+  [0] admin (role:1) room:myroom
+----------------------------------
+Database: open | WAL: open | users: open
+Emergency FIFO: /tmp/voxos_emergency
+Press Ctrl+C to stop the server

@@ -6,6 +6,9 @@
 #include <arpa/inet.h>
 #include <sys/epoll.h>
 
+void process_client_command(client *c, const char *raw_command);
+void disconnect_client(int client_fd);
+void remove_client_from_room(room *r, client *c);
 
 #define MAX_EVENTS 64
 #define UDP_BUFFER_SIZE 65536 // 64KB
@@ -161,7 +164,9 @@ static void accept_new_client()
 
     memset(new_client,0,sizeof(client));
     new_client->fd=client_fd;
+    new_client->slot=slot;
     new_client->is_active=1;
+    new_client->ref_count=1;
     new_client->user_id=-1; // not assigned yet
     new_client->role=ROLE_GUEST; // default role
     new_client->is_mute=0; // not muted by default
@@ -179,8 +184,7 @@ static void accept_new_client()
 
     log_message("INFO","New client connected from %s. Assigned slot %d, fd %d" ,inet_ntoa(client_addr.sin_addr),slot,client_fd);
 
-    char welcome_msg[]="Welcome to VoxOS! Please login .\n";
-    send(client_fd,welcome_msg,strlen(welcome_msg),0);
+
 }
 
 static void handle_tcp_command(int client_fd)
@@ -211,7 +215,8 @@ static void handle_tcp_command(int client_fd)
         if(clients[i]!=NULL && clients[i]->fd==client_fd)
         {
             c=clients[i];
-             break;
+            c->ref_count++;
+            break;
         }
     }
 
@@ -223,10 +228,10 @@ static void handle_tcp_command(int client_fd)
         return;
     }
 
-    process_client_commnand(c,buffer);
+    process_client_command(c,buffer);
 }
 
-static void handle_udp_packer()
+static void handle_udp_packet()
 {
     audio_packet pkt;
     struct sockaddr_in sender_addr;
@@ -243,9 +248,24 @@ static void handle_udp_packer()
         return;
     }
 
-    if(shm_ring!=NULL)
+    if(pkt.sender_id<MAX_CLIENTS)
     {
-        ring_buffer_push(shm_ring,&pkt);
+        pthread_mutex_lock(&clients_mutex);
+        client *c=clients[pkt.sender_id];
+        if(c!=NULL)
+        {
+            c->udp_addr=sender_addr;
+            c->udp_addr_len=addr_len;
+        }
+        pthread_mutex_unlock(&clients_mutex);
+    }
+
+    if(pkt.payload_size > 0)
+    {
+        if (shm_ring != NULL)
+        {
+            ring_buffer_push(shm_ring, &pkt);
+        }
     }
 }
 
@@ -263,10 +283,16 @@ void disconnect_client(int client_fd)
             }
             epoll_ctl(epoll_fd,EPOLL_CTL_DEL,client_fd,NULL);
             close(c->fd);
-            free(c);
+            c->is_active = 0;
             clients[i]=NULL;
             client_count--;
-            log_message("INFO","Client fd %d disconnected and cleaned up",client_fd);
+            c->ref_count--;
+            if(c->ref_count == 0) {
+                free(c);
+                log_message("INFO","Client fd %d disconnected and cleaned up",client_fd);
+            } else {
+                log_message("INFO","Client fd %d disconnected but retained for worker thread",client_fd);
+            }
             break;
         }
     }

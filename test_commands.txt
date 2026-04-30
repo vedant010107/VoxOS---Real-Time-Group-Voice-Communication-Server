@@ -1,0 +1,6 @@
+LOGIN admin admin123
+CREATE myroom pass
+LIST
+JOIN myroom pass
+STATUS
+QUIT

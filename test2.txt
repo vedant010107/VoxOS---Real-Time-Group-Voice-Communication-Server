@@ -1,0 +1,6 @@
+LOGIN admin admin123
+CREATE myroom pass
+JOIN myroom pass
+START
+sleep 3
+QUIT
