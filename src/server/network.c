@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>   // TCP_NODELAY
 #include <arpa/inet.h>
 #include <sys/epoll.h>
 
@@ -10,12 +11,19 @@ void process_client_command(client *c, const char *raw_command);
 void disconnect_client(int client_fd);
 void remove_client_from_room(room *r, client *c);
 
-#define MAX_EVENTS 64
+#define MAX_EVENTS 128
 #define UDP_BUFFER_SIZE 65536 // 64KB
+
+// O(1) fd → client-slot map (direct index by fd value)
+// Eliminates O(N) linear scan of clients[] on every TCP message
+#define FD_MAP_SIZE 4096
+static int fd_to_slot[FD_MAP_SIZE];
 
 
 void network_init(int port)
 {
+    // Initialize the fd→slot map to -1 (empty)
+    memset(fd_to_slot, -1, sizeof(fd_to_slot));
     tcp_listen_fd=socket(AF_INET,SOCK_STREAM,0);
     if (tcp_listen_fd==-1)
     {
@@ -62,6 +70,18 @@ void network_init(int port)
 
     flags=fcntl(udp_fd,F_GETFL,0);
     fcntl(udp_fd,F_SETFL,flags|O_NONBLOCK);
+
+    // Enlarge UDP kernel receive buffer to 8 MB so burst audio packets
+    // from 50 concurrent clients are never silently dropped before epoll wakes up
+    int udp_rcvbuf = 8 * 1024 * 1024;
+    if(setsockopt(udp_fd, SOL_SOCKET, SO_RCVBUF, &udp_rcvbuf, sizeof(udp_rcvbuf)) == 0)
+    {
+        log_message("INFO", "UDP receive buffer set to 8 MB");
+    }
+    else
+    {
+        log_message("WARN", "Could not set UDP receive buffer: %s", strerror(errno));
+    }
 
     struct sockaddr_in udp_addr;
     memset(&udp_addr,0,sizeof(udp_addr));
@@ -126,6 +146,11 @@ static void accept_new_client()
     int flags=fcntl(client_fd,F_GETFL,0);
     fcntl(client_fd,F_SETFL,flags|O_NONBLOCK);
 
+    // Disable Nagle's algorithm: send command responses (LOGIN OK, JOIN OK, etc.)
+    // immediately without the 40ms batching delay TCP applies to small packets.
+    int yes = 1;
+    setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes));
+
     pthread_mutex_lock(&clients_mutex);
 
     if(client_count>=MAX_CLIENTS)
@@ -174,6 +199,12 @@ static void accept_new_client()
     clients[slot]=new_client;
     client_count++;
 
+    // Register in the O(1) fd→slot map
+    if(client_fd >= 0 && client_fd < FD_MAP_SIZE)
+    {
+        fd_to_slot[client_fd] = slot;
+    }
+
     pthread_mutex_unlock(&clients_mutex);
 
     struct epoll_event ev;
@@ -208,18 +239,19 @@ static void handle_tcp_command(int client_fd)
 
     buffer[bytes]='\0';
 
+    // O(1) lookup: fd_to_slot[fd] gives the slot index directly,
+    // replacing the old O(N) linear scan through all client slots.
     pthread_mutex_lock(&clients_mutex);
     client *c=NULL;
-    for(int i=0;i<MAX_CLIENTS;i++)
+    if(client_fd >= 0 && client_fd < FD_MAP_SIZE)
     {
-        if(clients[i]!=NULL && clients[i]->fd==client_fd)
+        int slot = fd_to_slot[client_fd];
+        if(slot != -1 && slot < MAX_CLIENTS && clients[slot] != NULL)
         {
-            c=clients[i];
+            c = clients[slot];
             c->ref_count++;
-            break;
         }
     }
-
     pthread_mutex_unlock(&clients_mutex);
 
     if(c==NULL)
@@ -272,28 +304,40 @@ static void handle_udp_packet()
 void disconnect_client(int client_fd)
 {
     pthread_mutex_lock(&clients_mutex);
-    for(int i=0;i<MAX_CLIENTS;i++)
+
+    // O(1) slot lookup to find and remove the client
+    client *c = NULL;
+    int slot = -1;
+    if(client_fd >= 0 && client_fd < FD_MAP_SIZE)
     {
-        if(clients[i]!=NULL && clients[i]->fd==client_fd)
+        slot = fd_to_slot[client_fd];
+    }
+
+    if(slot != -1 && slot < MAX_CLIENTS && clients[slot] != NULL && clients[slot]->fd == client_fd)
+    {
+        c = clients[slot];
+        if(c->current_room != NULL)
         {
-            client *c=clients[i];
-            if(c->current_room!=NULL)
-            {
-                remove_client_from_room(c->current_room,c);
-            }
-            epoll_ctl(epoll_fd,EPOLL_CTL_DEL,client_fd,NULL);
-            close(c->fd);
-            c->is_active = 0;
-            clients[i]=NULL;
-            client_count--;
-            c->ref_count--;
-            if(c->ref_count == 0) {
-                free(c);
-                log_message("INFO","Client fd %d disconnected and cleaned up",client_fd);
-            } else {
-                log_message("INFO","Client fd %d disconnected but retained for worker thread",client_fd);
-            }
-            break;
+            remove_client_from_room(c->current_room, c);
+        }
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_fd, NULL);
+        close(c->fd);
+        c->is_active = 0;
+        clients[slot] = NULL;
+        client_count--;
+
+        // Clear the fd→slot mapping
+        if(client_fd >= 0 && client_fd < FD_MAP_SIZE)
+        {
+            fd_to_slot[client_fd] = -1;
+        }
+
+        c->ref_count--;
+        if(c->ref_count == 0) {
+            free(c);
+            log_message("INFO", "Client fd %d disconnected and cleaned up", client_fd);
+        } else {
+            log_message("INFO", "Client fd %d disconnected but retained for worker thread", client_fd);
         }
     }
     pthread_mutex_unlock(&clients_mutex);

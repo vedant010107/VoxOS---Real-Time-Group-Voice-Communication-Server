@@ -22,7 +22,10 @@ void auth_init()
         strcpy(admin.role,"ADMIN");
         sha256_hash("admin123",admin.password_hash);
 
-        write(users_fd,&admin,sizeof(admin));
+        if(write(users_fd, &admin, sizeof(admin)) != (ssize_t)sizeof(admin))
+        {
+            log_message("ERROR", "Failed to write default admin record to disk: %s", strerror(errno));
+        }
         log_message("INFO","Default admin user created with username 'admin' and password 'admin123'");
 
     }
@@ -124,7 +127,11 @@ int auth_add_user(const char *username,const char *password,const char *role)
     sha256_hash(password,new_user.password_hash);
 
     lseek(users_fd,0,SEEK_END);
-    write(users_fd,&new_user,sizeof(new_user));
+    if(write(users_fd, &new_user, sizeof(new_user)) != (ssize_t)sizeof(new_user))
+    {
+        log_message("ERROR", "Failed to persist new user '%s' to disk: %s", username, strerror(errno));
+        return 0;
+    }
 
     log_message("INFO","New user added: %s with role %s",username,role);
     return 1;
@@ -154,7 +161,11 @@ int auth_promote_user(const char *username, const char *new_role)
     rec.role[MAX_ROLE_LEN - 1] = '\0';
     
     lseek(users_fd, offset, SEEK_SET);
-    write(users_fd, &rec, sizeof(rec));
+    if(write(users_fd, &rec, sizeof(rec)) != (ssize_t)sizeof(rec))
+    {
+        log_message("ERROR", "Failed to persist promoted role for user '%s': %s", username, strerror(errno));
+        return 0;
+    }
 
     log_message("INFO", "User %s promoted to %s", username, new_role);
     return 1;

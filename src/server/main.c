@@ -47,7 +47,7 @@ int main(int argc,char * argv[])
     signal(SIGINT,handle_signal);
     signal(SIGPIPE,SIG_IGN);
 
-    log_message("INFO","Starting VoxOS Server on port %d",server_port);
+    log_message("INFO","Starting EchoLink Server on port %d",server_port);
 
     file_db_init();
     auth_init();

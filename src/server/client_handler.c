@@ -1,9 +1,11 @@
+#define _POSIX_C_SOURCE 200809L
 #include "server.h"
+#include <strings.h>
 #include <errno.h>
 
 
-#define WORKER_THREADS 4
-#define MAX_QUEUED_TASKS 64
+#define WORKER_THREADS 8
+#define MAX_QUEUED_TASKS 256
 
 typedef struct 
 {
@@ -168,12 +170,12 @@ static void handle_login(client *c, char *args)
         return;
     }
 
-    char username[MAX_USERNAME_LEN];
-    char password[MAX_PASSWORD_LEN];
+    char username[MAX_USERNAME_LEN] = {0};
+    char password[MAX_PASSWORD_LEN] = {0};
 
     if(args!=NULL)
     {
-        sscanf(args,"%s %s",username,password);
+        sscanf(args,"%31s %63s",username,password);
     }
     
     if(strlen(username)==0 || strlen(password)==0)
@@ -215,7 +217,7 @@ static void handle_register(client *c, char *args)
 
     if(args!=NULL)
     {
-        sscanf(args,"%s %s",username,password);
+        sscanf(args,"%31s %63s",username,password);
     }
     
     if(strlen(username)==0 || strlen(password)==0)
@@ -269,12 +271,12 @@ static void handle_create_room(client *c, char *args)
         return;
     }
 
-    char room_name[MAX_ROOM_NAME_LEN];
-    char password[MAX_PASSWORD_LEN];
+    char room_name[MAX_ROOM_NAME_LEN] = {0};
+    char password[MAX_PASSWORD_LEN] = {0};
 
     if(args!=NULL)
     {
-        sscanf(args,"%s %s",room_name,password);
+        sscanf(args,"%31s %63s",room_name,password);
     }
 
     if(strlen(room_name)==0)
@@ -313,11 +315,11 @@ static void handle_join_room(client *c, char *args)
         return;
     }
 
-    char room_name[MAX_ROOM_NAME_LEN];
-    char room_password[MAX_PASSWORD_LEN];
+    char room_name[MAX_ROOM_NAME_LEN] = {0};
+    char room_password[MAX_PASSWORD_LEN] = {0};
     if(args!=NULL)
     {
-        sscanf(args,"%s %s",room_name,room_password);
+        sscanf(args,"%31s %63s",room_name,room_password);
     }
 
     if(strlen(room_name)==0)
@@ -406,10 +408,10 @@ static void handle_kick(client *c, char *args)
         return;
     }
 
-    char target_name[MAX_USERNAME_LEN];
+    char target_name[MAX_USERNAME_LEN] = {0};
     if(args!=NULL)
     {
-        sscanf(args,"%s",target_name);
+        sscanf(args,"%31s",target_name);
 
     }
 
@@ -439,8 +441,16 @@ static void handle_kick(client *c, char *args)
         return;
     }
 
+    // Save room name before room_leave — room_leave may delete the room
+    // if participant_count drops to 0, causing a use-after-free crash.
+    char kicked_room[MAX_ROOM_NAME_LEN];
+    snprintf(kicked_room, sizeof(kicked_room), "%s",
+             c->current_room ? c->current_room->room_name : "unknown");
+    char kicked_user[MAX_USERNAME_LEN];
+    snprintf(kicked_user, sizeof(kicked_user), "%s", target->username);
+
     room_leave(target);
-    log_message("INFO","Client %s kicked user %s from room %s",c->username,target->username,c->current_room->room_name);
+    log_message("INFO","Client %s kicked user %s from room %s",c->username, kicked_user, kicked_room);
     send_ok(c,"User kicked successfully",NULL);
 }
 
@@ -464,10 +474,10 @@ static void handle_mute(client *c,char *args)
         return;
     }
 
-    char target_name[MAX_USERNAME_LEN];
+    char target_name[MAX_USERNAME_LEN] = {0};
     if(args!=NULL)
     {
-        sscanf(args,"%s",target_name);
+        sscanf(args,"%31s",target_name);
     }
 
     if(strlen(target_name)==0)
@@ -503,8 +513,9 @@ static void handle_mute(client *c,char *args)
     }
     else
     {
+        pthread_mutex_unlock(&c->current_room->lock);
         send_error(c,STATUS_ERR_NOT_FOUND,"Target user not found in the room");
-        return ;
+        return;
     }
     pthread_mutex_unlock(&c->current_room->lock);
 }
@@ -536,7 +547,7 @@ static void handle_promote(client *c, char *args)
     
     if(args!=NULL)
     {
-        sscanf(args,"%s %s",target_name, role_name);
+        sscanf(args,"%31s %15s",target_name, role_name);
     }
 
     if(strlen(target_name)==0 || strlen(role_name)==0)
@@ -579,8 +590,7 @@ static void send_error(client *c, int status, const char *msg)
     memset(&resp, 0, sizeof(resp));
     resp.opcode=0;
     resp.status=status;
-    strncpy(resp.message, msg, 255);
-    resp.message[255]='\0';
+    snprintf(resp.message, sizeof(resp.message), "%s", msg);
     send_response(c->fd, &resp);
 }
 
@@ -590,12 +600,10 @@ static void send_ok(client *c, const char *msg, const char *data)
     memset(&resp, 0, sizeof(resp));
     resp.opcode= 0;
     resp.status=STATUS_OK;
-    strncpy(resp.message, msg, 255);
-    resp.message[255]='\0';
+    snprintf(resp.message, sizeof(resp.message), "%s", msg);
     if (data!=NULL) 
     {
-        strncpy(resp.data,data,MAX_PACKET_SIZE-1);
-        resp.data[MAX_PACKET_SIZE-1]='\0';
+        snprintf(resp.data, sizeof(resp.data), "%s", data);
     }
     send_response(c->fd,&resp);
 }

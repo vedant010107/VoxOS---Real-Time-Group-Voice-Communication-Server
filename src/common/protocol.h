@@ -13,8 +13,8 @@
 
 
 // Server constants
-#define MAX_CLIENTS 30
-#define MAX_ROOMS 16
+#define MAX_CLIENTS 50
+#define MAX_ROOMS 32
 #define MAX_USERNAME_LEN 32
 #define MAX_PASSWORD_LEN 64
 #define MAX_ROLE_LEN  16
@@ -22,8 +22,8 @@
 #define MAX_PACKET_SIZE  4096
 #define AUDIO_PAYLOAD_SIZE  2048
 #define JITTER_BUFFER_SIZE 20
-#define MAX_SPEAKERS_PER_ROOM 5
-#define RING_BUFFER_CAPACITY  64
+#define MAX_SPEAKERS_PER_ROOM 10
+#define RING_BUFFER_CAPACITY  128
 #define DEFAULT_PORT 8080
 
 // Roles
@@ -136,7 +136,7 @@ typedef struct
     socklen_t udp_addr_len;
 } client; // stays in memory
 
-typedef struct room
+struct room
 {
     int room_id;
     char room_name[MAX_ROOM_NAME_LEN];
@@ -147,7 +147,7 @@ typedef struct room
     pthread_mutex_t lock;
     struct room *prev; 
     struct room *next; // for linked list (dynamic deletion or addition)
-}room; // stays in memory
+}; // stays in memory
 
  
 

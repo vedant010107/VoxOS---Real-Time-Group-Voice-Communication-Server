@@ -1,10 +1,10 @@
 #!/bin/bash
 
 PORT=8080
-SERVER=./bin/voxos_server
-CLIENT=./bin/voxos_client
+SERVER=./bin/echolink_server
+CLIENT=./bin/echolink_client
 
-echo "=== VoxOS Test Harness ==="
+echo "=== EchoLink Test Harness ==="
 
 # Start server in background
 $SERVER $PORT &

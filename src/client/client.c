@@ -1,7 +1,7 @@
 #define _POSIX_C_SOURCE 199309L
 #define _DEFAULT_SOURCE 1
 
-#include "protocol.h"
+#include "../common/protocol.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -30,6 +30,33 @@ static void *audio_sender_thread(void *arg);
 static void *audio_receiver_thread(void *arg);
 static void  send_command(const char *fmt, ...);
 static void  receive_response(void);
+
+static void print_help(void) {
+    printf("\n\033[1;36m==============================================================\033[0m\n");
+    printf("\033[1;32m                    EchoLink Client Commands                    \033[0m\n");
+    printf("\033[1;36m==============================================================\033[0m\n");
+    printf("\033[1;33m[ Authentication ]\033[0m\n");
+    printf("  \033[1mREGISTER <user> <pass>\033[0m - Create a new account\n");
+    printf("  \033[1mLOGIN <user> <pass>\033[0m    - Log into your account\n");
+    printf("  \033[1mLOGOUT\033[0m                 - Log out of your account\n");
+    printf("\n\033[1;33m[ Rooms & Voice ]\033[0m\n");
+    printf("  \033[1mCREATE <room> <pass>\033[0m   - Create a new voice room\n");
+    printf("  \033[1mJOIN <room> <pass>\033[0m     - Join an existing room\n");
+    printf("  \033[1mSTART\033[0m                  - Connect to the audio stream (Mic is OFF)\n");
+    printf("  \033[1mUNMUTE\033[0m                 - Turn your microphone ON\n");
+    printf("  \033[1mMUTE\033[0m                   - Turn your microphone OFF\n");
+    printf("  \033[1mLEAVE\033[0m                  - Leave the current room\n");
+    printf("\n\033[1;33m[ Information ]\033[0m\n");
+    printf("  \033[1mLIST\033[0m                   - List all active rooms\n");
+    printf("  \033[1mSTATUS\033[0m                 - See your current role and room status\n");
+    printf("\n\033[1;33m[ Administration ]\033[0m\n");
+    printf("  \033[1mPROMOTE <user> <ROLE>\033[0m  - Change user role (Roles: ADMIN, MODERATOR)\n");
+    printf("  \033[1mKICK <user>\033[0m            - Kick a user from your room\n");
+    printf("\n\033[1;33m[ System ]\033[0m\n");
+    printf("  \033[1mHELP\033[0m                   - Show this help menu\n");
+    printf("  \033[1mQUIT / EXIT\033[0m            - Close the EchoLink client\n");
+    printf("\033[1;36m==============================================================\033[0m\n\n");
+}
 
 
 int main(int argc, char *argv[]) {
@@ -67,8 +94,8 @@ int main(int argc, char *argv[]) {
     inet_pton(AF_INET, server_ip, &udp_addr.sin_addr);
     connect(udp_fd, (struct sockaddr *)&udp_addr, sizeof(udp_addr));
 
-    printf("Commands: LOGIN, CREATE, JOIN, LEAVE, LIST, STATUS, LOGOUT\n");
-    printf("Audio:    START (join audio, mic OFF) | UNMUTE (speak) | MUTE (stop speaking)\n\n");
+    printf("\033[1;36mEchoLink Client successfully connected to %s:%d\033[0m\n", server_ip, port);
+    print_help();
 
     char line[512];
     int audio_started  = 0;  // receiver thread launched
@@ -82,6 +109,12 @@ int main(int argc, char *argv[]) {
         if (strcasecmp(line, "QUIT") == 0 || strcasecmp(line, "EXIT") == 0) {
             send_command("LOGOUT");
             break;
+        }
+
+        // Help
+        if (strcasecmp(line, "HELP") == 0) {
+            print_help();
+            continue;
         }
 
         // START  begin audio session — only starts the LISTENER (aplay), mic is fully OFF
@@ -117,11 +150,11 @@ int main(int argc, char *argv[]) {
                 mic_muted = 0;
                 pthread_t sender_t;
                 pthread_create(&sender_t, NULL, audio_sender_thread, NULL);
-                printf("[MIC] Mic is now ON — you are speaking.\n");
+                printf("\033[1;32m[MIC]\033[0m Mic is now ON — you are speaking.\n");
             } else {
                 // Subsequent UNMUTE: just clear the flag
                 mic_muted = 0;
-                printf("[MIC] Mic is now ON — you are speaking.\n");
+                printf("\033[1;32m[MIC]\033[0m Mic is now ON — you are speaking.\n");
             }
             continue;
         }
@@ -129,7 +162,7 @@ int main(int argc, char *argv[]) {
         // MUTE → stop mic (sender thread keeps running but discards audio)
         if (strcasecmp(line, "MUTE") == 0) {
             mic_muted = 1;
-            printf("[MIC] Mic is now OFF — listening only.\n");
+            printf("\033[1;33m[MIC]\033[0m Mic is now OFF — listening only.\n");
             continue;
         }
 
@@ -170,13 +203,19 @@ static void receive_response(void) {
     if (resp.status == 200 && strstr(resp.message, "Login successful") != NULL) {
         if (strlen(resp.data) > 0) {
             client_slot = atoi(resp.data);
-            printf("[SYS] Audio channel synced. Client ID: %d\n", client_slot);
+            printf("\033[1;36m[SYS]\033[0m Audio channel synced. Client ID: %d\n", client_slot);
         }
     }
 
-    printf("[%d] %s", resp.status, resp.message);
-    if (strlen(resp.data) > 0) printf("\n%s", resp.data);
-    printf("\n");
+    if (resp.status == 200) {
+        printf("\033[1;32m[SUCCESS]\033[0m %s\n", resp.message);
+    } else {
+        printf("\033[1;31m[ERROR %d]\033[0m %s\n", resp.status, resp.message);
+    }
+    
+    if (strlen(resp.data) > 0) {
+        printf("\033[0;36m%s\033[0m\n", resp.data);
+    }
 }
 
 

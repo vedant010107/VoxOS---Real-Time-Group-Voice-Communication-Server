@@ -2,14 +2,25 @@
 
 static pthread_t display_thread;
 
+/* Clears the terminal via ANSI escape codes.
+ * Wrapping the write() call satisfies -Wunused-result without hiding errors. */
+static void ansi_clear(void)
+{
+    const char seq[] = "\033[2J\033[H";
+    if(write(STDOUT_FILENO, seq, sizeof(seq) - 1) == -1)
+    {
+        /* Non-fatal: display corruption at worst */
+    }
+}
+
 static void *display_thread_main(void *arg) {
     (void)arg;
 
     while (server_on) {
-        // Clear the terminal (works on Linux/macOS)
-        system("clear");
+        // Clear the terminal — ANSI escape, no fork/exec overhead
+        ansi_clear();
 
-        printf("===== VOXOS SERVER STATUS =====\n");
+        printf("===== ECHOLINK SERVER STATUS =====\n");
         printf("Uptime: %lld ms | Port: %d | Clients: %d/%d\n",
                get_time_ms(), server_port, client_count, MAX_CLIENTS);
 
@@ -55,7 +66,7 @@ static void *display_thread_main(void *arg) {
                (wal_fd   != -1) ? "open" : "closed",
                (users_fd != -1) ? "open" : "closed");
 
-        printf("Emergency FIFO: /tmp/voxos_emergency\n");
+        printf("Emergency FIFO: /tmp/echolink_emergency\n");
         printf("Press Ctrl+C to stop the server\n");
 
         fflush(stdout);

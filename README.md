@@ -1,6 +1,6 @@
-# VoxOS - Real-Time Group Voice Communication Server
+# EchoLink - Real-Time Group Voice Communication Server
 
-VoxOS is a multi-client real-time voice chat server built in C. Designed as an Operating Systems course mini-project, it focuses on low-latency audio transmission, concurrent connection handling, and strict synchronization mechanisms. It utilizes a dual-protocol architecture: TCP for reliable command handling and UDP for real-time audio transport.
+EchoLink is a multi-client real-time voice chat server built in C. Designed as an Operating Systems course mini-project, it focuses on low-latency audio transmission, concurrent connection handling, and strict synchronization mechanisms. It utilizes a dual-protocol architecture: TCP for reliable command handling and UDP for real-time audio transport.
 
 ## Features
 
@@ -30,8 +30,8 @@ make
 ```
 
 This will create two executables in the `bin/` directory:
-- `bin/voxos_server`
-- `bin/voxos_client`
+- `bin/echolink_server`
+- `bin/echolink_client`
 
 To clean the build files:
 ```bash
@@ -43,14 +43,14 @@ make clean
 ### Starting the Server
 
 ```bash
-./bin/voxos_server [port]
+./bin/echolink_server [port]
 ```
 If no port is specified, it defaults to a pre-configured port.
 
 ### Starting a Client
 
 ```bash
-./bin/voxos_client <server_ip> <port>
+./bin/echolink_client <server_ip> <port>
 ```
 
 ### Client Workflow Example

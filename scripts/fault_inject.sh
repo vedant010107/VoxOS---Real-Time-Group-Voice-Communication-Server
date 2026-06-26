@@ -1,8 +1,8 @@
 #!/bin/bash
 
 PORT=8080
-SERVER=./bin/voxos_server
-CLIENT=./bin/voxos_client
+SERVER=./bin/echolink_server
+CLIENT=./bin/echolink_client
 
 echo "=== Fault Injection Test ==="
 

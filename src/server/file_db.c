@@ -4,6 +4,15 @@
 #include <errno.h>
 
 
+/* Helper: write to the WAL fd and log on failure.
+ * Using a wrapper silences -Wunused-result without hiding real errors. */
+static void wal_write(int fd, const char *buf, int len)
+{
+    if(write(fd, buf, (size_t)len) != (ssize_t)len)
+    {
+        log_message("WARN", "WAL write incomplete: %s", strerror(errno));
+    }
+}
 
 static void wal_restore_old(int record_id, char **lines, int start, int line_count);
 
@@ -162,23 +171,21 @@ void wal_begin(int record_id,room_record *old_rec,room_record *new_rec)
     int len;
 
     len=snprintf(line,sizeof(line),"BEGIN %d\n",record_id);
-
-    write(wal_fd,line,len);
+    wal_write(wal_fd, line, len);
 
     if(old_rec!=NULL)
     {
         len=snprintf(line,sizeof(line),"OLD %d %s %s %d %d\n",old_rec->room_id,old_rec->room_name,old_rec->password,old_rec->is_active,old_rec->user_count);
-        write(wal_fd,line,len);
+        wal_write(wal_fd, line, len);
     }
     else
     {
         len=snprintf(line,sizeof(line),"OLD NULL\n");
-        write(wal_fd,line,len);
+        wal_write(wal_fd, line, len);
     }
 
     len=snprintf(line,sizeof(line),"NEW %d %s %s %d %d\n",new_rec->room_id,new_rec->room_name,new_rec->password,new_rec->is_active,new_rec->user_count);
-
-    write(wal_fd,line,len);
+    wal_write(wal_fd, line, len);
 
     fsync(wal_fd);
 }
@@ -187,7 +194,7 @@ void wal_commit(int record_id)
 {
     char line[512];
     int len=snprintf(line,sizeof(line),"COMMIT %d\n",record_id);
-    write(wal_fd,line,len);
+    wal_write(wal_fd, line, len);
     fsync(wal_fd);
 }
 
@@ -195,7 +202,7 @@ void wal_rollback(int record_id)
 {
     char line[512];
     int len = snprintf(line, sizeof(line), "ROLLBACK %d\n", record_id);
-    write(wal_fd, line, len);
+    wal_write(wal_fd, line, len);
     fsync(wal_fd);
 
     log_message("WARN", "WAL: Rolling back transaction %d", record_id);
@@ -329,8 +336,11 @@ void wal_recover()
 
     free(buffer);
 
-    // clear WAL after recovery
-    ftruncate(wal_fd, 0);
+    // clear WAL after recovery — non-critical; worst case WAL replays on next start
+    if(ftruncate(wal_fd, 0) == -1)
+    {
+        log_message("WARN", "WAL truncate failed: %s", strerror(errno));
+    }
     lseek(wal_fd, 0, SEEK_SET);
 }
 
@@ -357,7 +367,10 @@ static void wal_restore_old(int record_id, char **lines, int start, int line_cou
                 fcntl(rooms_fd, F_SETLKW, &lock);
 
                 lseek(rooms_fd, lock.l_start, SEEK_SET);
-                write(rooms_fd, &empty, sizeof(empty));
+                if(write(rooms_fd, &empty, sizeof(empty)) != (ssize_t)sizeof(empty))
+                {
+                    log_message("WARN", "WAL: failed to delete incomplete record %d", record_id);
+                }
 
                 lock.l_type = F_UNLCK;
                 fcntl(rooms_fd, F_SETLK, &lock);
@@ -369,7 +382,7 @@ static void wal_restore_old(int record_id, char **lines, int start, int line_cou
             // parse old data
             room_record old_rec;
             memset(&old_rec, 0, sizeof(old_rec));
-            sscanf(lines[i], "OLD %d %s %s %d %d",
+            sscanf(lines[i], "OLD %d %31s %63s %d %d",
                    &old_rec.room_id, old_rec.room_name,
                    old_rec.password, &old_rec.is_active,
                    &old_rec.user_count);
@@ -384,7 +397,10 @@ static void wal_restore_old(int record_id, char **lines, int start, int line_cou
             fcntl(rooms_fd, F_SETLKW, &lock);
 
             lseek(rooms_fd, lock.l_start, SEEK_SET);
-            write(rooms_fd, &old_rec, sizeof(old_rec));
+            if(write(rooms_fd, &old_rec, sizeof(old_rec)) != (ssize_t)sizeof(old_rec))
+            {
+                log_message("WARN", "WAL: failed to restore old record %d", record_id);
+            }
 
             lock.l_type = F_UNLCK;
             fcntl(rooms_fd, F_SETLK, &lock);

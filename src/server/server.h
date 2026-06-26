@@ -1,7 +1,7 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-#include "protocol.h"
+#include "../common/protocol.h"
 #include <unistd.h>    // for usleep
 
 extern int server_on;

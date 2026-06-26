@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -g -pthread -Isrc/common -Isrc/server
+CFLAGS = -Wall -Wextra -g -O2 -pthread -Isrc/common -Isrc/server
 LDFLAGS = -pthread -lrt
 
 SERVER_SRCS = src/server/main.c \
@@ -19,8 +19,8 @@ CLIENT_SRCS = src/client/client.c \
 SERVER_OBJS = $(SERVER_SRCS:.c=.o)
 CLIENT_OBJS = $(CLIENT_SRCS:.c=.o)
 
-SERVER_BIN = bin/voxos_server
-CLIENT_BIN = bin/voxos_client
+SERVER_BIN = bin/echolink_server
+CLIENT_BIN = bin/echolink_client
 
 .PHONY: all clean dirs
 

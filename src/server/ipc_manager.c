@@ -1,3 +1,5 @@
+#define _DEFAULT_SOURCE
+#define _XOPEN_SOURCE 500
 #include "server.h"
 
 #include <sys/mman.h>
@@ -20,7 +22,7 @@ static void *fifo_thread_main(void *arg);
 
 void ipc_manager_init()
 {
-    int shm_fd=shm_open("/voxos_ring",O_RDWR|O_CREAT,0644);
+    int shm_fd=shm_open("/echolink_ring",O_RDWR|O_CREAT,0644);
     if(shm_fd==-1)
     {
         log_message("ERROR","Failed to create shared memory: %s",strerror(errno));
@@ -47,15 +49,15 @@ void ipc_manager_init()
     sem_init(&ring_empty,1,RING_BUFFER_CAPACITY);
     sem_init(&ring_full,1,0);
 
-    unlink("/tmp/voxos_emergency");
+    unlink("/tmp/echolink_emergency");
 
-    if(mkfifo("/tmp/voxos_emergency",0600)==-1)
+    if(mkfifo("/tmp/echolink_emergency",0600)==-1)
     {
         log_message("ERROR","Failed to create FIFO: %s",strerror(errno));
     }
     else
     {
-        fifo_fd=open("/tmp/voxos_emergency",O_RDONLY|O_NONBLOCK);
+        fifo_fd=open("/tmp/echolink_emergency",O_RDONLY|O_NONBLOCK);
         if(fifo_fd==-1)
         {
             log_message("ERROR","Failed to open FIFO: %s",strerror(errno));
@@ -63,7 +65,7 @@ void ipc_manager_init()
         else
         {
             pthread_create(&fifo_thread,NULL,fifo_thread_main,NULL);
-            log_message("INFO","Emergency FIFO ready: /temp/voxos_emergency");
+            log_message("INFO","Emergency FIFO ready: /temp/echolink_emergency");
         }
     }
 
@@ -74,7 +76,14 @@ void ipc_manager_init()
 
 int ring_buffer_push(ring_buffer *ring, audio_packet *pkt)
 {
-    sem_wait(&ring_empty);
+    // Non-blocking: if the ring is full, drop the packet rather than
+    // blocking the epoll thread. A blocked epoll thread would freeze ALL
+    // TCP command handling and UDP receives for all 50 clients.
+    if(sem_trywait(&ring_empty) != 0)
+    {
+        log_message("WARN", "Audio ring buffer full — dropping packet (ring overload)");
+        return 0;
+    }
     pthread_mutex_lock(&ring_mutex);
     // Write at tail, then advance tail
     memcpy(&ring->packets[ring->tail], pkt, sizeof(audio_packet));
@@ -132,7 +141,7 @@ static void *fifo_thread_main(void *arg)
         else if(n==0)
         {
             close(fifo_fd);    
-            fifo_fd=open("/tmp/voxos_emergency",O_RDONLY|O_NONBLOCK);
+            fifo_fd=open("/tmp/echolink_emergency",O_RDONLY|O_NONBLOCK);
         }
         else
         {
@@ -147,7 +156,7 @@ void ipc_manager_cleanup()
     if(shm_ring!=NULL)
     {
         munmap(shm_ring,sizeof(ring_buffer));
-        shm_unlink("/voxos_ring");
+        shm_unlink("/echolink_ring");
     }
 
     sem_destroy(&ring_empty);
@@ -157,6 +166,6 @@ void ipc_manager_cleanup()
     {
         close(fifo_fd);
     }
-    unlink("/tmp/voxos_emergency");
+    unlink("/tmp/echolink_emergency");
     log_message("INFO","IPC manager cleaned up successfully");
 }
